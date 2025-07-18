@@ -1,0 +1,85 @@
+trigger:
+  - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  terraformVersion: '1.8.5'
+  buildConfiguration: 'Release'
+  azureSubscription: 'YourAzureServiceConnection'
+  appName: 'your-app-service-name'
+  packagePath: '$(System.DefaultWorkingDirectory)/**/*.zip'
+  backendResourceGroup: 'your-rg-name'
+  backendStorageAccount: 'yourstorageaccount'
+  backendContainerName: 'tfstate'
+  backendStateKey: 'terraform.tfstate'
+
+stages:
+  - stage: TerraformProvision
+    displayName: 'Provision Infrastructure with Terraform'
+    jobs:
+      - job: TerraformJob
+        steps:
+          - task: TerraformInstaller@1
+            inputs:
+              terraformVersion: $(terraformVersion)
+
+          - task: TerraformCLI@1
+            displayName: 'Terraform Init'
+            inputs:
+              command: 'init'
+              backendType: 'azurerm'
+              backendServiceArm: $(azureSubscription)
+              backendAzureRmResourceGroupName: $(backendResourceGroup)
+              backendAzureRmStorageAccountName: $(backendStorageAccount)
+              backendAzureRmContainerName: $(backendContainerName)
+              backendAzureRmKey: $(backendStateKey)
+
+          - task: TerraformCLI@1
+            displayName: 'Terraform Plan'
+            inputs:
+              command: 'plan'
+              commandOptions: '-out=tfplan'
+              environmentServiceNameAzureRM: $(azureSubscription)
+
+          - task: TerraformCLI@1
+            displayName: 'Terraform Apply'
+            inputs:
+              command: 'apply'
+              commandOptions: 'tfplan'
+              environmentServiceNameAzureRM: $(azureSubscription)
+
+  - stage: BuildAndDeploy
+    displayName: 'Build and Deploy ASP.NET Core Web API'
+    jobs:
+      - job: BuildAndPublish
+        steps:
+          - task: UseDotNet@2
+            inputs:
+              packageType: 'sdk'
+              version: '8.x'
+
+          - task: DotNetCoreCLI@2
+            inputs:
+              command: 'restore'
+              projects: '**/*.csproj'
+
+          - task: DotNetCoreCLI@2
+            inputs:
+              command: 'build'
+              projects: '**/*.csproj'
+              arguments: '--configuration $(buildConfiguration)'
+
+          - task: DotNetCoreCLI@2
+            inputs:
+              command: 'publish'
+              publishWebProjects: true
+              arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+              zipAfterPublish: true
+
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: $(azureSubscription)
+              appName: $(appName)
+              package: $(packagePath)

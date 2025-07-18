@@ -18,14 +18,14 @@ namespace ClientSearch.Data.Repository
             _dbContext = context;
             _dbSet = context.Set<TEntity>();
         }
-        public async Task<IEnumerable<TEntity>> SearchClientAsync<T>(Expression<Func<TEntity, bool>> filter)
-        {
-            IQueryable<TEntity> query = _dbSet;
 
-            if (filter != null)
-            {
-                query = query.Where(filter);
-            }
+        public IQueryable<TEntity> GetBaseQuery()
+        {
+            return _dbContext.Set<TEntity>().AsQueryable<TEntity>();
+        }
+
+        public async Task<IEnumerable<TEntity>> SearchClientAsync<TEntity>(IQueryable<TEntity> query)
+        {
             return await query.ToListAsync();
         }
     }

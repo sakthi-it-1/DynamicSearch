@@ -1,4 +1,4 @@
-﻿namespace ClientSearch.Models.Models;
+﻿namespace ClientSearch.Models.Search;
 
 public record Filter
 {
